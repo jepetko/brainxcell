@@ -1,0 +1,11 @@
+server: http://localhost:9999
+
+load:
+  - jasmine/lib/jasmine-1.3.1/jasmine.js
+  - jasmine-jstd-adapter/src/JasmineAdapter.js
+  - jasmine-jquery/jasmine-jquery.js
+  - jquery/jquery-1.9.1.js
+  - js/brainxcell.js
+
+test:
+  - test/brainxcell_test.js
