@@ -1,6 +1,11 @@
 describe('brainxcell', function() {
 
     var b = brainxcell;
+    function createTgt() {
+        $('body').append('<div id="tgt"></div>');
+        return $('#tgt');
+    }
+    var tgt = createTgt();
 
     beforeEach( function() {
 
@@ -38,6 +43,12 @@ describe('brainxcell', function() {
         var firstBranch_0 = firstBranch.children[0];
         expect(firstBranch_0.id).toBe('calling');
         expect(firstBranch_0.desc).toBe('Howto call them');
-    })
+    });
+
+    describe("brainxcell rendering", function() {
+        it("should render the root in the middle of the tgt", function() {
+            root().render(tgt,null);
+        })
+    });
 
 });

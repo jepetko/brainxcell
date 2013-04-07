@@ -1,8 +1,14 @@
+.brainxcell {
+    font-size: 15px;
+}
+
 .brainxcell-node {
-
+    position: relative;
+    border: 2px solid black;
+    padding: 5px;
+    width: 200px;
 }
 
-.brainxcell-node-to-node {
+.brainxcell-conn {
 
 }
-

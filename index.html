@@ -2,8 +2,22 @@
 <html>
     <head>
         <title>brainxcell</title>
+        <script type="text/javascript" src="jquery/jquery-1.9.1.js"></script>
+        <script type="text/javascript" src="js/brainxcell.js"></script>
+        <link rel="stylesheet" type="text/css" href="css/style.css">
+        <link rel="stylesheet" type="text/css" href="test/style_test.css">
+        <script type="text/javascript">
+
+            $(function() {
+                var tgt = $('#tgt');
+                root({id : 'Javascript'}).render(tgt);
+            });
+
+        </script>
     </head>
     <body>
+        <div id="tgt">
 
+        </div>
     </body>
 </html>

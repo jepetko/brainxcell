@@ -6,6 +6,8 @@ load:
   - jasmine-jquery/jasmine-jquery.js
   - jquery/jquery-1.9.1.js
   - js/brainxcell.js
+  - css/style.css
+  - test/style_test.css
 
 test:
   - test/brainxcell_test.js
