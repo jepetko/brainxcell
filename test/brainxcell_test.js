@@ -47,7 +47,8 @@ describe('brainxcell', function() {
 
     describe("brainxcell rendering", function() {
         it("should render the root in the middle of the tgt", function() {
-            root().render(tgt,null);
+            root().play(tgt);
+            //todo: check whether it's in the middle
         })
     });
 

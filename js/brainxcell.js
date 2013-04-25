@@ -2,7 +2,7 @@
  * brainxcell DSL
  * author: K. Golbang
  *
- * brainxcell is an easy way to build mainmaps using a javascript DSL.
+ * brainxcell is an easy way to build mindmaps using a javascript DSL.
  */
 var brainxcell = (function($) {
 
@@ -46,61 +46,152 @@ var brainxcell = (function($) {
         this.init(cfg);
     }
 
-    function Renderable() {
-        this.render = function(tgt,pos) {
-            if(!this.id)
+    function Renderer(tgt) {
+        this.tgt = tgt;
+        this.simulation = [];
+
+        this.half = function(val) {
+            if(!$.isNumeric(val))
+                return null;
+            return Math.round(val/2);
+        }
+        this.render = function(node) {
+            if(!node.id)
                 return null;
 
-            if( !pos ) {
-                pos = {};
-                var w = tgt.width();
-                console.log(w);
-                var h = tgt.height();
-                console.log(h);
-                pos.top = Math.round(w/2);
-                pos.left = Math.round(h/2);
+            var f = null;
+            if( node.isRoot() ) {
+
+                f = $.proxy( (function(node) {
+                        return function() {
+                            var w = this.tgt.width();
+                            var h = this.tgt.height();
+                            var pos = { top : this.half(h), left : this.half(w) };
+                            var tpl = this.getNodeTpl(node);
+
+                            this.tgt.append(tpl);
+                            var res = this.tgt.children(this.getNodeTplId(node,true));
+
+                            var elWidth = res.width(), elHeight = res.height();
+                            pos.left -= this.half(elWidth);
+                            pos.top -= this.half(elHeight);
+
+                            res.css('top', pos.top + 'px');
+                            res.css('left', pos.left + 'px');
+                            node.setPos(pos);
+                        }
+                })(node), this);
+
+            } else {
+
+                f = $.proxy( (function(node) {
+                        return function() {
+                            var pos = node.parent.getPos();
+                            var tpl = this.getNodeTpl(node);
+
+                            this.tgt.append(tpl);
+                            var res = this.tgt.children(this.getNodeTplId(node,true));
+                            res.css('top', pos.top + 'px');
+                            res.css('left', pos.left + 'px');
+                            res.animate( {"left" : "+=100px", "top" : "+=100px" }, "slow" );
+                        }
+                })(node), this);
+
             }
-
-            var tpl = this.getNodeTpl();
-            tgt.append(tpl);
-            var res = tgt.children(this.getNodeTplId(true));
-
-            res.css('top', pos.top + 'px');
-            res.css('left', pos.left + 'px');
-            res.css('visibility', 'visible');
+            this.simulation.push(f);
         }
-        this.getNodeTplId = function(asJQuerySel) {
-            var id = asJQuerySel ? '#' : '';
-            id += "node-" + this.id;
+        this.play = function(node) {
+            this.render(node);
+
+            for( var i=0; i<this.simulation.length; i++ ) {
+                var sim = this.simulation[i];
+                $(this).queue( (function(t,sim) {
+                    return function() {
+                        sim.call(null);
+                        //dequeue:
+                        setTimeout( (function(t) {
+                            return function() {
+                                $(t).dequeue();
+                            }
+                        })(t), 100);
+                    }
+                })(this,sim) );
+            }
+        }
+        this.getNodeTplId = function(node, as$Sel) {
+            var id = as$Sel ? '#' : '';
+            id += "node-" + node.id;
             return id;
         }
-        this.getNodeTpl = function() {
-            return '<div class="brainxcell brainxcell-node" style="visibility:hidden;" id="' + this.getNodeTplId(false) + '">'
-                    + this.desc + '</div>';
+        this.getConnTplId = function(fromNode, toNode, as$Sel) {
+            var id = as$Sel ? '#' : '';
+            id += "conn-" + fromNode.id + "-" + toNode.id;
+            return id;
         }
-        this.getConnectTpl = function(to) {
-            return '<div class="brainxcell brainxcell-conn" id="conn-"' + this.id + "-" + to.id + '"/>';
+        this.getNodeTpl = function(node) {
+            return '<div class="brainxcell brainxcell-node" id="' + this.getNodeTplId(node,false) + '">'
+                    + node.desc + '</div>';
+        }
+        this.getConnectTpl = function(fromNode, toNode) {
+            return '<div class="brainxcell brainxcell-conn" id="' + this.getConnTplId(fromNode,toNode,false) + '"/>';
         }
     }
 
     function Node(cfg) {
-        Utils.mix([Configurable,Renderable],this);
+        Utils.mix([Configurable],this);
         this.id = 'nameless';
         this.desc = 'TODO: description';
+        this.__pos = null;
         this.init(cfg);
+
+        this.setPos = function(pos) {
+            this.__pos = pos;
+        }
+        this.getPos = function() {
+            return this.__pos || { top : 0, left : 0 };
+        }
+        this.play = function(tgt) {
+            var renderer = new Renderer(tgt);
+            renderer.play(this);
+        }
     }
 
-    function Branch(cfg) {
+    function Branch(parent,cfg) {
         this.children = [];
+        this.parent = parent;
         this.branch = function(cfg) {
             for(var i=0;i<this.children.length;i++) {
                 var ch = this.children[i];
                 if(ch.id === cfg.id)
                     return ch;
             }
-            var b = new Branch(cfg);
+            var b = new Branch(this,cfg);
             this.children.push(b);
             return b;
+        }
+        this.hasChildren = function() {
+            return this.children && this.children.length>0;
+        }
+        this.isRoot = function() {
+            return (this.parent == null);
+        }
+        this.getDepth = function() {
+            var depth = 1;
+            if( this.hasChildren() ) {
+                var max = 0;
+                for(var i=0; i<this.children.length; i++ ) {
+                    var ch = this.children[i];
+                    var d = ch.getDepth();
+                    if( max == null ) {
+                        max = ch;
+                    } else {
+                        if(ch > max)
+                            max = ch;
+                    }
+                }
+                depth += max;
+            }
+            return depth;
         }
         this.init(cfg);
     }
