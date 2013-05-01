@@ -48,6 +48,7 @@ var brainxcell = (function($) {
 
     function Renderer(tgt) {
         this.tgt = tgt;
+        this.totalDepth = 1;
         this.simulation = [];
 
         this.half = function(val) {
@@ -55,65 +56,115 @@ var brainxcell = (function($) {
                 return null;
             return Math.round(val/2);
         }
-        this.render = function(node) {
+
+        this.relLeft = function(node,nodeDepth) {
+            var parentRes = node.parent.getRes();
+            var totalWidth = this.tgt.outerWidth();
+
+            var res = node.getRes();
+            var width = res.outerWidth();
+
+            var delta = this.half(totalWidth)/this.totalDepth*nodeDepth-this.half(width);
+            return delta;
+        }
+
+        this.relTop = function(node,nodeDepth) {
+            var parentRes = node.parent.getRes();
+            var totalHeight = this.tgt.outerWidth();
+
+            var res = node.getRes();
+            var height = res.outerHeight();
+
+            var parts = node.parent.children.length * this.totalDepth;
+            var childRank = (nodeDepth-1) * (node.childIndex+1);
+            var delta = this.half(totalHeight)/parts*childRank-this.half(height);
+            return delta;
+        }
+
+        this.renderRoot = function(node) {
+            return $.proxy( (function(node) {
+                return function() {
+                    var w = this.tgt.width();
+                    var h = this.tgt.height();
+                    var pos = { top : this.half(h), left : this.half(w) };
+                    var tpl = this.getNodeTpl(node);
+
+                    this.tgt.append(tpl);
+                    var res = this.tgt.children(this.getNodeTplId(node,true));
+
+                    var elWidth = res.width(), elHeight = res.height();
+                    pos.left -= this.half(elWidth);
+                    pos.top -= this.half(elHeight);
+
+                    res.css('top', pos.top + 'px');
+                    res.css('left', pos.left + 'px');
+                    node.setRes(res);
+                }
+            })(node), this);
+        }
+
+        this.renderNode = function(node,nodeDepth) {
+            return $.proxy( (function(node) {
+                return function() {
+                    var parentRes = node.parent.getRes();
+
+                    var tpl = this.getNodeTpl(node);
+                    this.tgt.append(tpl);
+
+                    var res = this.tgt.children(this.getNodeTplId(node,true));
+                    node.setRes(res);
+                    res.css('top', parentRes.css("top"));
+                    res.css('left', parentRes.css("left"));
+                    var width = this.relLeft(node,nodeDepth);
+                    var height = this.relTop(node,nodeDepth);
+
+                    res.animate( {  "left" : "+=" + width + "px",
+                                    "top" : height + "px" }, "slow" );
+                }
+            })(node), this);
+        }
+
+        this.render = function(node,nodeDepth) {
             if(!node.id)
                 return null;
 
+            if( typeof nodeDepth === 'undefined' )
+                nodeDepth = 1;
+            else
+                ++nodeDepth;
+
             var f = null;
             if( node.isRoot() ) {
-
-                f = $.proxy( (function(node) {
-                        return function() {
-                            var w = this.tgt.width();
-                            var h = this.tgt.height();
-                            var pos = { top : this.half(h), left : this.half(w) };
-                            var tpl = this.getNodeTpl(node);
-
-                            this.tgt.append(tpl);
-                            var res = this.tgt.children(this.getNodeTplId(node,true));
-
-                            var elWidth = res.width(), elHeight = res.height();
-                            pos.left -= this.half(elWidth);
-                            pos.top -= this.half(elHeight);
-
-                            res.css('top', pos.top + 'px');
-                            res.css('left', pos.left + 'px');
-                            node.setPos(pos);
-                        }
-                })(node), this);
-
+                this.totalDepth = node.getDepth();
+                f = this.renderRoot(node);
             } else {
-
-                f = $.proxy( (function(node) {
-                        return function() {
-                            var pos = node.parent.getPos();
-                            var tpl = this.getNodeTpl(node);
-
-                            this.tgt.append(tpl);
-                            var res = this.tgt.children(this.getNodeTplId(node,true));
-                            res.css('top', pos.top + 'px');
-                            res.css('left', pos.left + 'px');
-                            res.animate( {"left" : "+=100px", "top" : "+=100px" }, "slow" );
-                        }
-                })(node), this);
-
+                f = this.renderNode(node,nodeDepth);
             }
             this.simulation.push(f);
+
+            if(node.hasChildren()) {
+                var ch = node.children;
+                for(var i=0;i<ch.length;i++)
+                    this.render(ch[i],nodeDepth);
+            }
         }
         this.play = function(node) {
             this.render(node);
+            /*
+            for(var i=0;i<this.simulation.length;i++) {
+                var prev = this.simulation[i];
+                $.when( prev.call(null)).done( console.log('done') );
+            }*/
 
             for( var i=0; i<this.simulation.length; i++ ) {
                 var sim = this.simulation[i];
                 $(this).queue( (function(t,sim) {
                     return function() {
-                        sim.call(null);
-                        //dequeue:
-                        setTimeout( (function(t) {
+                        $.when( sim.call(null)).done( (function(t) {
                             return function() {
                                 $(t).dequeue();
                             }
-                        })(t), 100);
+                        })(t) );
                     }
                 })(this,sim) );
             }
@@ -130,7 +181,7 @@ var brainxcell = (function($) {
         }
         this.getNodeTpl = function(node) {
             return '<div class="brainxcell brainxcell-node" id="' + this.getNodeTplId(node,false) + '">'
-                    + node.desc + '</div>';
+                    + (node.desc || node.id) + '</div>';
         }
         this.getConnectTpl = function(fromNode, toNode) {
             return '<div class="brainxcell brainxcell-conn" id="' + this.getConnTplId(fromNode,toNode,false) + '"/>';
@@ -140,15 +191,15 @@ var brainxcell = (function($) {
     function Node(cfg) {
         Utils.mix([Configurable],this);
         this.id = 'nameless';
-        this.desc = 'TODO: description';
-        this.__pos = null;
+        this.desc = null;
+        this.res = null;
         this.init(cfg);
 
-        this.setPos = function(pos) {
-            this.__pos = pos;
+        this.setRes = function(res) {
+            this.res = res;
         }
-        this.getPos = function() {
-            return this.__pos || { top : 0, left : 0 };
+        this.getRes = function() {
+            return this.res;
         }
         this.play = function(tgt) {
             var renderer = new Renderer(tgt);
@@ -159,6 +210,7 @@ var brainxcell = (function($) {
     function Branch(parent,cfg) {
         this.children = [];
         this.parent = parent;
+        this.childIndex = 0;
         this.branch = function(cfg) {
             for(var i=0;i<this.children.length;i++) {
                 var ch = this.children[i];
@@ -166,6 +218,7 @@ var brainxcell = (function($) {
                     return ch;
             }
             var b = new Branch(this,cfg);
+            b.childIndex = this.children.length;
             this.children.push(b);
             return b;
         }
@@ -185,8 +238,8 @@ var brainxcell = (function($) {
                     if( max == null ) {
                         max = ch;
                     } else {
-                        if(ch > max)
-                            max = ch;
+                        if(d > max)
+                            max = d;
                     }
                 }
                 depth += max;

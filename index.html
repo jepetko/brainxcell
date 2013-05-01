@@ -10,7 +10,10 @@
 
             $(function() {
                 var tgt = $('#tgt');
-                root({id : 'Javascript'}).branch({id : 'Variables'}).play(tgt);
+                root({id : 'Javascript'}).branch({id : 'Variables'});
+                root().branch({id : 'Functions'});
+                root().branch({id : 'Closures'});
+                root().play(tgt);
             });
 
         </script>

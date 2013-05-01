@@ -45,9 +45,14 @@ describe('brainxcell', function() {
         expect(firstBranch_0.desc).toBe('Howto call them');
     });
 
+    it('should have depth = 5', function() {
+        root().branch({id : 'A'}).branch({id : 'B'}).branch({id : 'C'}).branch({id : 'D'});
+        expect( root().getDepth()).toBe(5);
+    });
+
     describe("brainxcell rendering", function() {
         it("should render the root in the middle of the tgt", function() {
-            root().play(tgt);
+            //root().play(tgt);
             //todo: check whether it's in the middle
         })
     });
